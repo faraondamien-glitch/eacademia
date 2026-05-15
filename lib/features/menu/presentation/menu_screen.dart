@@ -52,6 +52,30 @@ class MenuScreen extends ConsumerWidget {
           const SizedBox(height: 28),
 
           // ── Actions secondaires ────────────────────────────────────────
+          // ── Administration (isAdmin uniquement) ────────────────────────
+          if (user.isAdmin) ...[
+            const Divider(),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A2E),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.admin_panel_settings,
+                    color: Colors.white, size: 20),
+              ),
+              title: const Text('Administration',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('Gérer le contenu & les utilisateurs'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/admin'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+
           const Divider(),
           const SizedBox(height: 8),
           _SecondaryAction(

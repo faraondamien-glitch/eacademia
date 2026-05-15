@@ -19,6 +19,11 @@ import '../../features/factures/presentation/factures_screen.dart';
 import '../../features/labo/presentation/labo_screen.dart';
 import '../../features/actualites/presentation/actualites_screen.dart';
 import '../../features/menu/presentation/menu_screen.dart';
+import '../../features/admin/presentation/admin_screen.dart';
+import '../../features/admin/presentation/screens/admin_actualites_screen.dart';
+import '../../features/admin/presentation/screens/admin_users_screen.dart';
+import '../../features/admin/presentation/screens/admin_notifications_screen.dart';
+import '../../features/admin/presentation/screens/admin_commandes_screen.dart';
 import '../../features/produits/presentation/pdf_viewer_screen.dart';
 import '../../shared/providers/user_provider.dart';
 
@@ -35,6 +40,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (!isLoggedIn && !isOnLogin) return '/login';
       if (isLoggedIn && isOnLogin) return '/dashboard';
+      // Guard admin : routes /admin/* accessibles uniquement si isAdmin
+      if (state.matchedLocation.startsWith('/admin')) {
+        final user = ref.read(userProvider);
+        if (user == null || !user.isAdmin) return '/dashboard';
+      }
       return null;
     },
     routes: [
@@ -155,6 +165,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/labo',
             name: 'labo',
             builder: (_, s) => const LaboScreen(),
+          ),
+
+          // ── Section Administration ─────────────────────────────────────
+          GoRoute(
+            path: '/admin',
+            name: 'admin',
+            builder: (_, s) => const AdminScreen(),
+            routes: [
+              GoRoute(
+                path: 'actualites',
+                name: 'admin-actualites',
+                builder: (_, s) => const AdminActualitesScreen(),
+              ),
+              GoRoute(
+                path: 'users',
+                name: 'admin-users',
+                builder: (_, s) => const AdminUsersScreen(),
+              ),
+              GoRoute(
+                path: 'notifications',
+                name: 'admin-notifications',
+                builder: (_, s) => const AdminNotificationsScreen(),
+              ),
+              GoRoute(
+                path: 'commandes',
+                name: 'admin-commandes',
+                builder: (_, s) => const AdminCommandesScreen(),
+              ),
+            ],
           ),
         ],
       ),

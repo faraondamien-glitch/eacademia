@@ -52,6 +52,11 @@ class UserModel {
   final String level;
   final DateTime createdAt;
 
+  /// Si true, l'utilisateur a accès à la section Administration.
+  /// À positionner manuellement dans Firebase Console :
+  /// users/{uid} → isAdmin: true
+  final bool isAdmin;
+
   const UserModel({
     required this.uid,
     required this.name,
@@ -60,6 +65,7 @@ class UserModel {
     required this.region,
     required this.level,
     required this.createdAt,
+    this.isAdmin = false,
   });
 
   String get firstName => name.split(' ').first;
@@ -74,6 +80,7 @@ class UserModel {
       region: data['region'] ?? '',
       level: data['level'] ?? 'Débutant',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isAdmin: data['isAdmin'] as bool? ?? false,
     );
   }
 
@@ -84,6 +91,7 @@ class UserModel {
         'region': region,
         'level': level,
         'createdAt': Timestamp.fromDate(createdAt),
+        'isAdmin': isAdmin,
       };
 }
 
