@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../data/formations_repository.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../data/learning360_repository.dart';
 import '../domain/formation_model.dart';
 import '../../../shared/providers/user_provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -8,275 +9,212 @@ import '../../../core/utils/formatters.dart';
 
 class FormationDetailScreen extends ConsumerWidget {
   final String formationId;
-  const FormationDetailScreen({super.key, required this.formationId});
+  final FormationWithProgress? preloaded; // passé via extra de GoRouter
+
+  const FormationDetailScreen({
+    super.key,
+    required this.formationId,
+    this.preloaded,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
-    final repo = ref.read(formationsRepositoryProvider);
 
-    return FutureBuilder<FormationModel?>(
-      future: repo.getFormation(formationId),
-      builder: (context, formSnap) {
-        if (formSnap.connectionState == ConnectionState.waiting) {
+    if (preloaded != null) {
+      return _DetailView(item: preloaded!, user: user);
+    }
+
+    // Fallback : on recharge le catalogue si on arrive directement sur cet écran
+    if (user == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: Text('Non connecté')),
+      );
+    }
+
+    return FutureBuilder<List<FormationWithProgress>>(
+      future: ref.read(learning360RepositoryProvider).getCatalog(
+            userId: user.uid,
+            userEmail: user.email,
+          ),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        final formation = formSnap.data;
-        if (formation == null) {
+        final item = snap.data?.where((e) => e.formation.id == formationId).firstOrNull;
+        if (item == null) {
           return Scaffold(
             appBar: AppBar(),
             body: const Center(child: Text('Formation introuvable')),
           );
         }
-
-        if (user == null) {
-          return Scaffold(
-            appBar: AppBar(title: Text(formation.title)),
-            body: const Center(child: Text('Non connecté')),
-          );
-        }
-
-        return StreamBuilder<ProgressModel?>(
-          stream: repo.watchProgress(user.uid, formationId),
-          builder: (context, progressSnap) {
-            final progress = progressSnap.data;
-            final completed = progress?.completedModules ?? [];
-            final total = formation.modules.length;
-            final pct = total > 0 ? completed.length / total : 0.0;
-            final isFinished = pct >= 1.0 && total > 0;
-
-            // Premier module non complété
-            int nextModuleIndex = formation.modules.indexWhere((m) {
-              final id = m['id']?.toString() ??
-                  'mod_${formation.modules.indexOf(m)}';
-              return !completed.contains(id);
-            });
-            if (nextModuleIndex == -1) nextModuleIndex = 0;
-
-            return Scaffold(
-              body: CustomScrollView(
-                slivers: [
-                  // AppBar avec header dégradé + progression
-                  SliverAppBar(
-                    expandedHeight: 220,
-                    pinned: true,
-                    title: Text(
-                      formation.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: _FormationHeader(
-                        formation: formation,
-                        progress: pct,
-                        completedCount: completed.length,
-                        totalCount: total,
-                        isFinished: isFinished,
-                      ),
-                    ),
-                  ),
-
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        // Méta-infos
-                        _MetaRow(formation: formation),
-                        const SizedBox(height: 16),
-
-                        // Thème
-                        if (formation.theme.isNotEmpty) ...[
-                          Wrap(
-                            children: [
-                              Chip(label: Text(formation.theme)),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // Description
-                        Text(
-                          formation.description,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 28),
-
-                        // Liste des modules
-                        Row(
-                          children: [
-                            Text(
-                              'Modules',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const Spacer(),
-                            Text(
-                              '${completed.length}/$total complétés',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelMedium
-                                  ?.copyWith(color: AppColors.primary),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        ...formation.modules.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final mod = entry.value;
-                          final modId =
-                              mod['id']?.toString() ?? 'mod_$i';
-                          final isDone = completed.contains(modId);
-                          final isNext = i == nextModuleIndex && !isFinished;
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _ModuleItem(
-                              index: i + 1,
-                              title: mod['title']?.toString() ??
-                                  'Module ${i + 1}',
-                              description:
-                                  mod['description']?.toString(),
-                              duration: mod['durationMinutes'] as int?,
-                              isCompleted: isDone,
-                              isNext: isNext,
-                              onTap: () => _openModule(
-                                context: context,
-                                ref: ref,
-                                repo: repo,
-                                userId: user.uid,
-                                formationId: formationId,
-                                modId: modId,
-                                modTitle: mod['title']?.toString() ??
-                                    'Module ${i + 1}',
-                                completed: completed,
-                                total: total,
-                                isDone: isDone,
-                              ),
-                            ),
-                          );
-                        }),
-                      ]),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Bouton flottant Commencer / Reprendre / Terminée
-              bottomNavigationBar: _BottomCta(
-                isFinished: isFinished,
-                hasStarted: completed.isNotEmpty,
-                onPressed: () => _openModule(
-                  context: context,
-                  ref: ref,
-                  repo: repo,
-                  userId: user.uid,
-                  formationId: formationId,
-                  modId: formation.modules[nextModuleIndex]['id']
-                          ?.toString() ??
-                      'mod_$nextModuleIndex',
-                  modTitle: formation.modules[nextModuleIndex]['title']
-                          ?.toString() ??
-                      'Module ${nextModuleIndex + 1}',
-                  completed: completed,
-                  total: total,
-                  isDone: false,
-                ),
-              ),
-            );
-          },
-        );
+        return _DetailView(item: item, user: user);
       },
     );
   }
+}
 
-  void _openModule({
-    required BuildContext context,
-    required WidgetRef ref,
-    required FormationsRepository repo,
-    required String userId,
-    required String formationId,
-    required String modId,
-    required String modTitle,
-    required List<String> completed,
-    required int total,
-    required bool isDone,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => _ModuleSheet(
-        modId: modId,
-        modTitle: modTitle,
-        isDone: isDone,
-        onMarkDone: () async {
-          final updated = List<String>.from(completed);
-          if (!updated.contains(modId)) updated.add(modId);
-          await repo.updateProgress(
-            userId: userId,
-            formationId: formationId,
-            completedModules: updated,
-            totalModules: total,
-          );
-          if (context.mounted) Navigator.pop(context);
-        },
+// ── Vue principale ────────────────────────────────────────────────────────────
+
+class _DetailView extends StatelessWidget {
+  final FormationWithProgress item;
+  final dynamic user;
+
+  const _DetailView({required this.item, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final f = item.formation;
+    final progress = item.completionRate;
+    final isCompleted = item.isCompleted;
+    final isEnrolled = item.isEnrolled;
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          // ── AppBar dégradé ─────────────────────────────────────────────
+          SliverAppBar(
+            expandedHeight: 240,
+            pinned: true,
+            title: Text(
+              f.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: _HeroHeader(
+                formation: f,
+                progress: progress,
+                isCompleted: isCompleted,
+                isEnrolled: isEnrolled,
+              ),
+            ),
+          ),
+
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // Méta-infos
+                _MetaRow(formation: f),
+                const SizedBox(height: 20),
+
+                // Thème
+                if (f.theme.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      Chip(
+                        label: Text(f.theme),
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.08),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Description
+                Text(
+                  f.description,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 28),
+
+                // Progression détaillée (si inscrit)
+                if (isEnrolled) ...[
+                  _ProgressSection(item: item),
+                  const SizedBox(height: 24),
+                ],
+
+                // Infos 360Learning
+                _L360InfoCard(item: item),
+              ]),
+            ),
+          ),
+        ],
+      ),
+
+      // ── CTA bas de page ────────────────────────────────────────────────────
+      bottomNavigationBar: _BottomCta(
+        isCompleted: isCompleted,
+        isEnrolled: isEnrolled,
+        playerUrl: item.playerUrl,
+        formation: f,
+        user: user,
       ),
     );
   }
 }
 
-// ── Header dégradé avec progression ─────────────────────────────────────────
+// ── Header dégradé ────────────────────────────────────────────────────────────
 
-class _FormationHeader extends StatelessWidget {
+class _HeroHeader extends StatelessWidget {
   final FormationModel formation;
   final double progress;
-  final int completedCount;
-  final int totalCount;
-  final bool isFinished;
+  final bool isCompleted;
+  final bool isEnrolled;
 
-  const _FormationHeader({
+  const _HeroHeader({
     required this.formation,
     required this.progress,
-    required this.completedCount,
-    required this.totalCount,
-    required this.isFinished,
+    required this.isCompleted,
+    required this.isEnrolled,
   });
 
   @override
   Widget build(BuildContext context) {
+    final Color colorA = isCompleted ? AppColors.successDark : AppColors.primaryDark;
+    final Color colorB = isCompleted ? AppColors.success : AppColors.primary;
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isFinished
-              ? [AppColors.successDark, AppColors.success]
-              : [AppColors.primaryDark, AppColors.primary],
+          colors: [colorA, colorB],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
       child: Stack(
         children: [
-          // Icône décorative
           Positioned(
             right: -20,
             bottom: -10,
             child: Icon(
               Icons.school,
-              size: 140,
-              color: Colors.white.withValues(alpha: 0.08),
+              size: 150,
+              color: Colors.white.withValues(alpha: 0.07),
             ),
           ),
-
-          // Contenu
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 80, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 80, 16, 20),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (totalCount > 0) ...[
+                // Badge source
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    '360Learning',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                if (isEnrolled) ...[
                   Row(
                     children: [
                       Expanded(
@@ -286,7 +224,7 @@ class _FormationHeader extends StatelessWidget {
                             value: progress,
                             backgroundColor:
                                 Colors.white.withValues(alpha: 0.25),
-                            color: isFinished
+                            color: isCompleted
                                 ? Colors.white
                                 : AppColors.secondary,
                             minHeight: 6,
@@ -299,22 +237,181 @@ class _FormationHeader extends StatelessWidget {
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
-                          fontSize: 13,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    isFinished
+                    isCompleted
                         ? '✓ Formation terminée'
-                        : '$completedCount/$totalCount modules',
+                        : '${completedModulesCount(progress, formation.totalModules)} / ${formation.totalModules} modules',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.85),
                       fontSize: 12,
                     ),
                   ),
-                ],
+                ] else
+                  Text(
+                    'Non inscrit — cliquez sur Commencer pour démarrer',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int completedModulesCount(double rate, int total) =>
+      (rate * total).round();
+}
+
+// ── Section progression ───────────────────────────────────────────────────────
+
+class _ProgressSection extends StatelessWidget {
+  final FormationWithProgress item;
+  const _ProgressSection({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final p = item.progress;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Ma progression', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _ProgCell(
+              value: '${p.completedModules}',
+              label: 'modules terminés',
+              color: AppColors.success,
+            ),
+            _ProgCell(
+              value: '${p.totalModules - p.completedModules}',
+              label: 'restants',
+              color: AppColors.primary,
+            ),
+            _ProgCell(
+              value: '${(p.completionRate * 100).round()}%',
+              label: 'complété',
+              color: item.isCompleted
+                  ? AppColors.success
+                  : AppColors.primary,
+            ),
+          ],
+        ),
+        if (p.lastAccessAt != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Dernier accès : ${Formatters.formatDate(p.lastAccessAt!)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProgCell extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+  const _ProgCell({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Info card 360Learning ─────────────────────────────────────────────────────
+
+class _L360InfoCard extends StatelessWidget {
+  final FormationWithProgress item;
+  const _L360InfoCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.open_in_new_outlined,
+                color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Contenu hébergé sur 360Learning',
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Le bouton ci-dessous ouvre votre espace de formation '
+                  'directement dans 360Learning.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
           ),
@@ -324,7 +421,7 @@ class _FormationHeader extends StatelessWidget {
   }
 }
 
-// ── Méta-infos (durée, modules) ───────────────────────────────────────────────
+// ── Méta-infos ────────────────────────────────────────────────────────────────
 
 class _MetaRow extends StatelessWidget {
   final FormationModel formation;
@@ -332,24 +429,24 @@ class _MetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
         _MetaChip(
           icon: Icons.access_time_outlined,
           label: Formatters.formatDuration(formation.durationMinutes),
         ),
-        const SizedBox(width: 8),
         _MetaChip(
           icon: Icons.layers_outlined,
-          label: '${formation.modules.length} modules',
+          label: '${formation.totalModules} modules',
         ),
-        if (formation.isNew) ...[
-          const SizedBox(width: 8),
+        if (formation.isNew)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: AppColors.success,
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(
               'NOUVEAU',
@@ -360,7 +457,6 @@ class _MetaRow extends StatelessWidget {
               ),
             ),
           ),
-        ],
       ],
     );
   }
@@ -391,142 +487,72 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
-// ── Item de module ────────────────────────────────────────────────────────────
+// ── CTA bas de page ───────────────────────────────────────────────────────────
 
-class _ModuleItem extends StatelessWidget {
-  final int index;
-  final String title;
-  final String? description;
-  final int? duration;
+class _BottomCta extends ConsumerStatefulWidget {
   final bool isCompleted;
-  final bool isNext;
-  final VoidCallback onTap;
-
-  const _ModuleItem({
-    required this.index,
-    required this.title,
-    this.description,
-    this.duration,
-    required this.isCompleted,
-    required this.isNext,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    Color leadColor = isCompleted
-        ? AppColors.success
-        : isNext
-            ? AppColors.primary
-            : AppColors.textDisabled;
-
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              // Numéro / icône
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: leadColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: isCompleted
-                      ? Icon(Icons.check, color: AppColors.success, size: 18)
-                      : Text(
-                          '$index',
-                          style: TextStyle(
-                            color: leadColor,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-
-              // Titre + sous-titre
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: isCompleted
-                            ? AppColors.textSecondary
-                            : theme.colorScheme.onSurface,
-                        decoration: isCompleted
-                            ? TextDecoration.none
-                            : null,
-                      ),
-                    ),
-                    if (description != null && description!.isNotEmpty)
-                      Text(
-                        description!,
-                        style: theme.textTheme.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    else
-                      Text(
-                        isCompleted
-                            ? 'Terminé'
-                            : isNext
-                                ? 'À faire maintenant'
-                                : 'À venir',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isNext ? AppColors.primary : null,
-                          fontWeight: isNext ? FontWeight.w600 : null,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Durée + chevron
-              if (duration != null) ...[
-                Text(
-                  Formatters.formatDuration(duration!),
-                  style: theme.textTheme.labelSmall,
-                ),
-                const SizedBox(width: 4),
-              ],
-              Icon(
-                isCompleted ? Icons.replay : Icons.play_arrow_outlined,
-                color: leadColor,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Bouton CTA bas de page ────────────────────────────────────────────────────
-
-class _BottomCta extends StatelessWidget {
-  final bool isFinished;
-  final bool hasStarted;
-  final VoidCallback onPressed;
+  final bool isEnrolled;
+  final String playerUrl;
+  final FormationModel formation;
+  final dynamic user;
 
   const _BottomCta({
-    required this.isFinished,
-    required this.hasStarted,
-    required this.onPressed,
+    required this.isCompleted,
+    required this.isEnrolled,
+    required this.playerUrl,
+    required this.formation,
+    required this.user,
   });
 
   @override
+  ConsumerState<_BottomCta> createState() => _BottomCtaState();
+}
+
+class _BottomCtaState extends ConsumerState<_BottomCta> {
+  bool _loading = false;
+
+  Future<void> _open() async {
+    setState(() => _loading = true);
+    try {
+      String url = widget.playerUrl;
+
+      // Si non inscrit et API configurée → inscrire d'abord
+      if (!widget.isEnrolled && widget.user != null) {
+        final repo = ref.read(learning360RepositoryProvider);
+        url = await repo.enrollAndGetUrl(
+          userId: widget.user.uid,
+          userEmail: widget.user.email,
+          programGuid: widget.formation.programGuid ?? widget.formation.id,
+        );
+      }
+
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossible d\'ouvrir : $url')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Color bg = widget.isCompleted ? AppColors.success : AppColors.primary;
+    final IconData ico = widget.isCompleted
+        ? Icons.replay
+        : widget.isEnrolled
+            ? Icons.play_arrow
+            : Icons.school_outlined;
+    final String label = widget.isCompleted
+        ? 'Revoir la formation'
+        : widget.isEnrolled
+            ? 'Reprendre sur 360Learning'
+            : 'Commencer sur 360Learning';
+
     return Container(
       padding: EdgeInsets.fromLTRB(
         16,
@@ -545,194 +571,17 @@ class _BottomCta extends StatelessWidget {
         ],
       ),
       child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(isFinished
-            ? Icons.replay
-            : hasStarted
-                ? Icons.play_arrow
-                : Icons.school_outlined),
-        label: Text(isFinished
-            ? 'Revoir la formation'
-            : hasStarted
-                ? 'Reprendre'
-                : 'Commencer'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isFinished ? AppColors.success : AppColors.primary,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Sheet de lecture de module ────────────────────────────────────────────────
-
-class _ModuleSheet extends StatelessWidget {
-  final String modId;
-  final String modTitle;
-  final bool isDone;
-  final Future<void> Function() onMarkDone;
-
-  const _ModuleSheet({
-    required this.modId,
-    required this.modTitle,
-    required this.isDone,
-    required this.onMarkDone,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scrollCtrl) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              // Poignée
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.outline,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
-              // Entête
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        modTitle,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: ListView(
-                  controller: scrollCtrl,
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    // Placeholder contenu module
-                    Container(
-                      height: 180,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.play_circle_outline,
-                                size: 56, color: AppColors.primary),
-                            SizedBox(height: 8),
-                            Text('Contenu du module',
-                                style: TextStyle(color: AppColors.textSecondary)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Contenu pédagogique',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Le contenu de ce module sera chargé depuis Firebase Storage '
-                      '(vidéo, slides ou texte enrichi) en fonction du type défini '
-                      'dans le document Firestore du module.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Bouton marquer comme terminé
-                    if (!isDone)
-                      _MarkDoneButton(onPressed: onMarkDone)
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.check_circle,
-                                color: AppColors.success),
-                            SizedBox(width: 8),
-                            Text(
-                              'Module déjà terminé',
-                              style: TextStyle(
-                                color: AppColors.success,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MarkDoneButton extends StatefulWidget {
-  final Future<void> Function() onPressed;
-  const _MarkDoneButton({required this.onPressed});
-
-  @override
-  State<_MarkDoneButton> createState() => _MarkDoneButtonState();
-}
-
-class _MarkDoneButtonState extends State<_MarkDoneButton> {
-  bool _loading = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: _loading
-          ? null
-          : () async {
-              setState(() => _loading = true);
-              await widget.onPressed();
-            },
-      icon: _loading
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.white),
-            )
-          : const Icon(Icons.check),
-      label: const Text('Marquer comme terminé'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.success,
+        onPressed: _loading ? null : _open,
+        icon: _loading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
+              )
+            : Icon(ico),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(backgroundColor: bg),
       ),
     );
   }

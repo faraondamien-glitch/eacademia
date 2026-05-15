@@ -1,3 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -222,6 +225,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : const Text('Se connecter'),
                   ),
 
+                  // ── Bouton de seed (DEBUG uniquement) ─────────────────
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Mode développement',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.science_outlined, size: 16),
+                      label: const Text('Créer compte test'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.deepOrange,
+                        side: const BorderSide(color: Colors.deepOrange),
+                      ),
+                      onPressed: _isLoading ? null : _createTestAccount,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'test@eacademia.fr / Test1234!',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.deepOrange.withValues(alpha: 0.7),
+                        fontFamily: 'monospace',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  // ──────────────────────────────────────────────────────
+
                   const SizedBox(height: 40),
                   Center(
                     child: Text(
@@ -238,6 +275,75 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+
+  // ── Seed compte de test (DEBUG uniquement) ────────────────────────────────
+  static const _testEmail = 'test@eacademia.fr';
+  static const _testPassword = 'Test1234!';
+
+  Future<void> _createTestAccount() async {
+    setState(() { _isLoading = true; _errorMessage = null; });
+    try {
+      // 1. Créer ou récupérer l'utilisateur Firebase Auth
+      UserCredential cred;
+      try {
+        cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _testEmail,
+          password: _testPassword,
+        );
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'email-already-in-use') {
+          // Compte existe déjà → on se connecte directement
+          cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: _testEmail,
+            password: _testPassword,
+          );
+        } else {
+          rethrow;
+        }
+      }
+
+      final uid = cred.user!.uid;
+
+      // 2. Créer le document Firestore (si absent)
+      final ref = FirebaseFirestore.instance.collection('users').doc(uid);
+      final snap = await ref.get();
+      if (!snap.exists) {
+        await ref.set({
+          'name': 'Dr. Test Pharmacien',
+          'email': _testEmail,
+          'role': 'pharmacien',
+          'region': 'Île-de-France',
+          'level': 'Expert',
+          'createdAt': Timestamp.now(),
+        });
+      }
+
+      // 3. Pré-remplir les champs et notifier
+      if (mounted) {
+        _emailController.text = _testEmail;
+        _passwordController.text = _testPassword;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Compte test prêt — cliquez sur Se connecter'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        // Auto-login
+        await FirebaseAuth.instance.signOut(); // on repasse par signIn normal
+        setState(() => _isLoading = false);
+        await _signIn();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Erreur seed : ${e.toString()}';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   void _showPasswordReset() {
     final emailCtrl = TextEditingController(text: _emailController.text);

@@ -6,6 +6,7 @@ import '../../features/auth/domain/user_model.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/formations/presentation/formations_screen.dart';
 import '../../features/formations/presentation/formation_detail_screen.dart';
+import '../../features/formations/data/learning360_repository.dart';
 import '../../features/produits/presentation/produits_screen.dart';
 import '../../features/produits/presentation/produit_detail_screen.dart';
 import '../../features/pubs/presentation/pubs_screen.dart';
@@ -68,9 +69,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: ':id',
                 name: 'formation-detail',
-                builder: (_, state) => FormationDetailScreen(
-                  formationId: state.pathParameters['id']!,
-                ),
+                builder: (_, state) {
+                  // extra peut être un FormationWithProgress (depuis la liste)
+                  // ou null (navigation directe par URL)
+                  final extra = state.extra;
+                  return FormationDetailScreen(
+                    formationId: state.pathParameters['id']!,
+                    preloaded: extra is FormationWithProgress ? extra : null,
+                  );
+                },
               ),
             ],
           ),
