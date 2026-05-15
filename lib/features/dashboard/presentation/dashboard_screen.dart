@@ -8,6 +8,9 @@ import '../data/dashboard_repository.dart';
 import 'widgets/kpi_card.dart';
 import 'widgets/notification_item.dart';
 import 'widgets/formation_progress_item.dart';
+import '../../../features/actualites/data/actualites_repository.dart';
+import '../../../features/actualites/domain/actu_model.dart';
+import '../../../features/actualites/presentation/widgets/actu_card.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -78,6 +81,22 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               _FormationsInProgress(userId: user.uid, repo: repo),
+              const SizedBox(height: 24),
+
+              // Fil d'actualités
+              Row(
+                children: [
+                  Text('Actualités',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => context.go('/actualites'),
+                    child: const Text('Voir tout'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _ActualitesFeed(role: user.role.value),
               const SizedBox(height: 24),
             ],
           ),
@@ -402,6 +421,69 @@ class _SkeletonList extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Fil d'actualités (aperçu 3 dernières) ────────────────────────────────────
+
+class _ActualitesFeed extends ConsumerWidget {
+  final String role;
+  const _ActualitesFeed({required this.role});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return StreamBuilder<List<ActuModel>>(
+      stream: ref
+          .read(actualitesRepositoryProvider)
+          .watchActualites(role: role),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          final base =
+              Theme.of(context).colorScheme.surfaceContainerHighest;
+          return Column(
+            children: List.generate(
+              2,
+              (i) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: base,
+                      borderRadius: BorderRadius.circular(12),
+                    )),
+              ),
+            ),
+          );
+        }
+
+        final list = (snap.data ?? []).take(3).toList();
+
+        if (list.isEmpty) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Icon(Icons.newspaper_outlined,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  const Text('Aucune actualité pour le moment'),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: list
+              .map((a) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: ActuCard(actu: a),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }
