@@ -17,6 +17,8 @@ import '../../features/packs/presentation/commande_form_screen.dart';
 import '../../features/challenges/presentation/challenges_screen.dart';
 import '../../features/factures/presentation/factures_screen.dart';
 import '../../features/labo/presentation/labo_screen.dart';
+import '../../features/actualites/presentation/actualites_screen.dart';
+import '../../features/menu/presentation/menu_screen.dart';
 import '../../features/produits/presentation/pdf_viewer_screen.dart';
 import '../../shared/providers/user_provider.dart';
 
@@ -41,21 +43,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'login',
         builder: (_, s) => const LoginScreen(),
       ),
-      // Route partagée plein-écran (sans barre de nav) pour le viewer PDF
+      // Viewer PDF plein-écran (sans barre de nav)
       GoRoute(
         path: '/pdf-viewer',
         name: 'pdf-viewer',
         builder: (_, state) {
           final extra = state.extra as Map<String, String>;
-          return PdfViewerScreen(
-            url: extra['url']!,
-            title: extra['title']!,
-          );
+          return PdfViewerScreen(url: extra['url']!, title: extra['title']!);
         },
       ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
+          // ── Nav principale ─────────────────────────────────────────────
           GoRoute(
             path: '/dashboard',
             name: 'dashboard',
@@ -70,16 +70,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: ':id',
                 name: 'formation-detail',
                 builder: (_, state) {
-                  // extra peut être un FormationWithProgress (depuis la liste)
-                  // ou null (navigation directe par URL)
                   final extra = state.extra;
                   return FormationDetailScreen(
                     formationId: state.pathParameters['id']!,
-                    preloaded: extra is FormationWithProgress ? extra : null,
+                    preloaded:
+                        extra is FormationWithProgress ? extra : null,
                   );
                 },
               ),
             ],
+          ),
+          GoRoute(
+            path: '/challenges',
+            name: 'challenges',
+            builder: (_, s) => const ChallengesScreen(),
+          ),
+          GoRoute(
+            path: '/menu',
+            name: 'menu',
+            builder: (_, s) => const MenuScreen(),
+          ),
+
+          // ── Features accessibles depuis le Menu ────────────────────────
+          GoRoute(
+            path: '/actualites',
+            name: 'actualites',
+            builder: (_, s) => const ActualitesScreen(),
           ),
           GoRoute(
             path: '/produits',
@@ -103,9 +119,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: ':id',
                 name: 'pub-player',
-                builder: (_, state) => PubPlayerScreen(
-                  pubId: state.pathParameters['id']!,
-                ),
+                builder: (_, state) =>
+                    PubPlayerScreen(pubId: state.pathParameters['id']!),
               ),
             ],
           ),
@@ -117,9 +132,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: ':id',
                 name: 'pack-detail',
-                builder: (_, state) => PackDetailScreen(
-                  packId: state.pathParameters['id']!,
-                ),
+                builder: (_, state) =>
+                    PackDetailScreen(packId: state.pathParameters['id']!),
                 routes: [
                   GoRoute(
                     path: 'commander',
@@ -131,11 +145,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 ],
               ),
             ],
-          ),
-          GoRoute(
-            path: '/challenges',
-            name: 'challenges',
-            builder: (_, s) => const ChallengesScreen(),
           ),
           GoRoute(
             path: '/factures',
@@ -153,40 +162,50 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Notifier léger : écoute le userProvider via Riverpod et notifie GoRouter
+// ── Notifier GoRouter ─────────────────────────────────────────────────────────
+
 class _GoRouterNotifier extends ChangeNotifier {
   _GoRouterNotifier(Ref ref) {
     ref.listen<UserModel?>(userProvider, (_, _) => notifyListeners());
   }
 }
 
-// ── Shell adaptatif ──────────────────────────────────────────────────────────
+// ── Shell avec navigation simplifiée ─────────────────────────────────────────
 
 class AppShell extends ConsumerWidget {
   final Widget child;
   const AppShell({super.key, required this.child});
+
+  // 4 onglets fixes — pas dépendants du rôle
+  static const _navItems = [
+    _NavItem('/dashboard', 'Accueil', Icons.home_outlined, Icons.home),
+    _NavItem('/formations', 'Formations', Icons.school_outlined, Icons.school),
+    _NavItem('/challenges', 'Challenges',
+        Icons.emoji_events_outlined, Icons.emoji_events),
+    _NavItem('/menu', 'Menu', Icons.grid_view_outlined, Icons.grid_view),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
     if (user == null) return child;
 
-    final width = MediaQuery.of(context).size.width;
-    final isTablet = width >= 600;
-    final modules = RolePermissions.getModules(user.role);
-    final navItems = _buildNavItems(modules);
     final location = GoRouterState.of(context).matchedLocation;
-    final currentIndex = _getCurrentIndex(location, navItems);
+    final currentIndex = _currentIndex(location);
+    final width = MediaQuery.of(context).size.width;
 
-    if (isTablet) {
+    // ── Tablet : NavigationRail ────────────────────────────────────────────
+    if (width >= 600) {
       return Scaffold(
         body: Row(
           children: [
             NavigationRail(
-              selectedIndex: currentIndex < 0 ? 0 : currentIndex,
+              selectedIndex: currentIndex,
               extended: width >= 900,
-              onDestinationSelected: (i) => context.go(navItems[i].route),
-              destinations: navItems
+              leading: _LogoRail(extended: width >= 900),
+              onDestinationSelected: (i) =>
+                  context.go(_navItems[i].route),
+              destinations: _navItems
                   .map((item) => NavigationRailDestination(
                         icon: Icon(item.icon),
                         selectedIcon: Icon(item.selectedIcon),
@@ -201,15 +220,16 @@ class AppShell extends ConsumerWidget {
       );
     }
 
+    // ── Mobile : NavigationBar (Material 3) ────────────────────────────────
     return Scaffold(
       body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex < 0 ? 0 : currentIndex,
-        onTap: (i) => context.go(navItems[i].route),
-        items: navItems
-            .map((item) => BottomNavigationBarItem(
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected: (i) => context.go(_navItems[i].route),
+        destinations: _navItems
+            .map((item) => NavigationDestination(
                   icon: Icon(item.icon),
-                  activeIcon: Icon(item.selectedIcon),
+                  selectedIcon: Icon(item.selectedIcon),
                   label: item.label,
                 ))
             .toList(),
@@ -217,34 +237,104 @@ class AppShell extends ConsumerWidget {
     );
   }
 
-  int _getCurrentIndex(String location, List<_NavItem> items) {
-    for (var i = 0; i < items.length; i++) {
-      if (location.startsWith(items[i].route)) return i;
+  int _currentIndex(String location) {
+    // Menu : toutes les pages "secondaires" pointent vers l'onglet Menu
+    const menuRoutes = [
+      '/menu', '/actualites', '/produits', '/pubs',
+      '/packs', '/factures', '/labo', '/analytics',
+    ];
+    for (var i = 0; i < _navItems.length - 1; i++) {
+      if (location.startsWith(_navItems[i].route)) return i;
+    }
+    if (menuRoutes.any((r) => location.startsWith(r))) {
+      return _navItems.length - 1; // onglet Menu
     }
     return 0;
   }
+}
 
-  static const _all = [
-    _NavItem('dashboard', '/dashboard', 'Accueil', Icons.home_outlined, Icons.home),
-    _NavItem('formations', '/formations', 'Formations', Icons.school_outlined, Icons.school),
-    _NavItem('produits', '/produits', 'Produits', Icons.medication_outlined, Icons.medication),
-    _NavItem('pubs', '/pubs', 'Pubs TV', Icons.tv_outlined, Icons.tv),
-    _NavItem('packs', '/packs', 'Packs', Icons.inventory_2_outlined, Icons.inventory_2),
-    _NavItem('challenges', '/challenges', 'Challenges', Icons.emoji_events_outlined, Icons.emoji_events),
-    _NavItem('factures', '/factures', 'Factures', Icons.receipt_long_outlined, Icons.receipt_long),
-    _NavItem('labo', '/labo', 'Le Labo', Icons.biotech_outlined, Icons.biotech),
-  ];
+// ── Logo compact pour NavigationRail ─────────────────────────────────────────
 
-  List<_NavItem> _buildNavItems(List<String> modules) =>
-      _all.where((item) => modules.contains(item.module)).toList();
+class _LogoRail extends StatelessWidget {
+  final bool extended;
+  const _LogoRail({required this.extended});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: _GranionsLogo(size: extended ? 40 : 32, showLabel: extended),
+    );
+  }
+}
+
+// ── Widget logo Granions (image ou fallback texte) ────────────────────────────
+
+class _GranionsLogo extends StatelessWidget {
+  final double size;
+  final bool showLabel;
+  const _GranionsLogo({this.size = 40, this.showLabel = false});
+
+  @override
+  Widget build(BuildContext context) {
+    // Essaie de charger l'image — fallback automatique si absente
+    return Image.asset(
+      'assets/images/logo_granions.png',
+      height: size,
+      errorBuilder: (context, err, stack) => _TextLogo(size: size, showLabel: showLabel),
+    );
+  }
+}
+
+class _TextLogo extends StatelessWidget {
+  final double size;
+  final bool showLabel;
+  const _TextLogo({required this.size, required this.showLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(size * 0.2),
+          ),
+          child: Center(
+            child: Text(
+              'G',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: size * 0.55,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+        if (showLabel) ...[
+          const SizedBox(width: 10),
+          Text(
+            'GRANIONS',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: size * 0.35,
+              letterSpacing: 2,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class _NavItem {
-  final String module;
   final String route;
   final String label;
   final IconData icon;
   final IconData selectedIcon;
-
-  const _NavItem(this.module, this.route, this.label, this.icon, this.selectedIcon);
+  const _NavItem(this.route, this.label, this.icon, this.selectedIcon);
 }

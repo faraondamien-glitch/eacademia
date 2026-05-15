@@ -90,18 +90,20 @@ class UserModel {
 class RolePermissions {
   static const Map<UserRole, List<String>> modules = {
     UserRole.pharmacien: [
-      'dashboard', 'formations', 'produits', 'pubs',
-      'packs', 'challenges', 'factures', 'labo',
+      'dashboard', 'formations', 'challenges', 'menu',
+      'actualites', 'produits', 'pubs', 'packs', 'factures', 'labo',
     ],
     UserRole.medecin: [
-      'dashboard', 'formations', 'produits', 'pubs', 'labo',
+      'dashboard', 'formations', 'challenges', 'menu',
+      'actualites', 'produits', 'pubs', 'labo',
     ],
     UserRole.kine: [
-      'dashboard', 'formations', 'produits', 'pubs', 'challenges', 'labo',
+      'dashboard', 'formations', 'challenges', 'menu',
+      'actualites', 'produits', 'pubs', 'labo',
     ],
     UserRole.commercial: [
-      'dashboard', 'formations', 'produits', 'pubs',
-      'packs', 'challenges', 'factures', 'labo', 'analytics',
+      'dashboard', 'formations', 'challenges', 'menu',
+      'actualites', 'produits', 'pubs', 'packs', 'factures', 'labo', 'analytics',
     ],
   };
 

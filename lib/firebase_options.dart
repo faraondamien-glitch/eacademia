@@ -23,12 +23,13 @@ class DefaultFirebaseOptions {
   // after running: flutterfire configure --project=YOUR_FIREBASE_PROJECT_ID
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'REPLACE_WITH_WEB_API_KEY',
-    appId: 'REPLACE_WITH_WEB_APP_ID',
-    messagingSenderId: 'REPLACE_WITH_SENDER_ID',
-    projectId: 'REPLACE_WITH_PROJECT_ID',
-    authDomain: 'REPLACE_WITH_PROJECT_ID.firebaseapp.com',
-    storageBucket: 'REPLACE_WITH_PROJECT_ID.appspot.com',
+    apiKey: 'AIzaSyAEyipri8FOQ9KojuAhqAhU8Aaie1LH5Po',
+    appId: '1:893780722918:web:e6f718bf82f5b05c046727',
+    messagingSenderId: '893780722918',
+    projectId: 'eacademia-app',
+    authDomain: 'eacademia-app.firebaseapp.com',
+    storageBucket: 'eacademia-app.firebasestorage.app',
+    measurementId: 'G-FQ4EKKFX81',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
