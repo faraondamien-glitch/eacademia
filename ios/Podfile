@@ -1,0 +1,106 @@
+platform :ios, '13.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+# Pods qui forment l'écosystème gRPC/abseil et doivent tous partager le même
+# standard C++ pour éviter les incompatibilités ABI (string_view, etc.)
+GRPC_PODS = %w[
+  abseil
+  gRPC-Core
+  gRPC-C++
+  BoringSSL-GRPC
+  gRPC-C++-boringssl-include
+].freeze
+
+post_install do |installer|
+  pods_root = installer.sandbox.root
+
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+
+    target.build_configurations.each do |config|
+      # Force iOS 13 minimum sur tous les pods
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+
+      # Force c++17 sur les pods de l'écosystème gRPC/abseil pour que leur
+      # ABI soit cohérente (sinon les absl::string_view et std::string_view
+      # ont des mangling différents entre c++14 et c++17)
+      if GRPC_PODS.include?(target.name)
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        config.build_settings['GCC_C_LANGUAGE_STANDARD'] = 'gnu11'
+      end
+    end
+
+    # Fix BoringSSL-GRPC : retire -GCC_WARN_INHIBIT_ALL_WARNINGS (parsé
+    # par le linker Apple comme l'option non supportée -G)
+    if target.name == 'BoringSSL-GRPC'
+      target.source_build_phase.files.each do |file|
+        next unless file.settings && file.settings['COMPILER_FLAGS']
+        file.settings['COMPILER_FLAGS'] =
+          file.settings['COMPILER_FLAGS'].gsub('-GCC_WARN_INHIBIT_ALL_WARNINGS', '')
+      end
+    end
+  end
+
+  # Patch direct des xcconfig gRPC-Core et abseil (le xcconfig généré par
+  # CocoaPods force c++14 et écrase les build settings du projet)
+  GRPC_PODS.each do |pod_name|
+    support_files = pods_root.join('Target Support Files', pod_name)
+    next unless support_files.exist?
+
+    Dir.glob(support_files.join('*.xcconfig')).each do |xcconfig_path|
+      content = File.read(xcconfig_path)
+      updated = content.gsub(
+        'CLANG_CXX_LANGUAGE_STANDARD = c++14',
+        'CLANG_CXX_LANGUAGE_STANDARD = c++17'
+      )
+      File.write(xcconfig_path, updated) if updated != content
+    end
+  end
+
+  # Patch source gRPC-Core basic_seq.h : Clang 17 rejette
+  # "Traits::template CallSeqFactory(...)" sans args template explicites.
+  basic_seq = pods_root.join(
+    'gRPC-Core', 'src', 'core', 'lib', 'promise', 'detail', 'basic_seq.h'
+  )
+  if basic_seq.exist?
+    content = File.read(basic_seq)
+    updated = content.gsub(
+      'Traits::template CallSeqFactory(',
+      'Traits::CallSeqFactory('
+    )
+    File.write(basic_seq, updated) if updated != content
+  end
+end
