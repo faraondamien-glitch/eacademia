@@ -1,12 +1,42 @@
 import 'package:flutter/material.dart';
 import '../../domain/challenge_model.dart';
+import '../../data/opeaz_repository.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 
+/// Carte challenge Opeaz enrichie avec progression utilisateur.
+class OpeazChallengeCard extends StatelessWidget {
+  final ChallengeWithProgress item;
+  const OpeazChallengeCard({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChallengeCard(
+      challenge: item.challenge,
+      progressRate: item.progressRate,
+      currentScore: item.currentScore,
+      userRank: item.userRank,
+      isWinner: item.isWinner,
+    );
+  }
+}
+
+/// Carte challenge de base (utilisable avec ou sans données Opeaz).
 class ChallengeCard extends StatelessWidget {
   final ChallengeModel challenge;
+  final double progressRate;
+  final int currentScore;
+  final int userRank;
+  final bool isWinner;
 
-  const ChallengeCard({super.key, required this.challenge});
+  const ChallengeCard({
+    super.key,
+    required this.challenge,
+    this.progressRate = 0.0,
+    this.currentScore = 0,
+    this.userRank = 0,
+    this.isWinner = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +167,81 @@ class ChallengeCard extends StatelessWidget {
               ),
             ],
 
+            // ── Progression Opeaz ─────────────────────────────────────
+            if (currentScore > 0 || progressRate > 0) ...[
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Ma progression',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              '$currentScore / ${challenge.objective} ${challenge.unit}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: progressRate >= 1.0
+                                    ? AppColors.success
+                                    : AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progressRate.clamp(0.0, 1.0),
+                            minHeight: 6,
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                            color: progressRate >= 1.0
+                                ? AppColors.success
+                                : AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (userRank > 0) ...[
+                    const SizedBox(width: 16),
+                    Column(
+                      children: [
+                        Text(
+                          '#$userRank',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: userRank <= 3
+                                ? AppColors.secondary
+                                : AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Text(
+                          'rang',
+                          style: TextStyle(
+                              fontSize: 10, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (isWinner) ...[
+                    const SizedBox(width: 8),
+                    const Text('🏆', style: TextStyle(fontSize: 22)),
+                  ],
+                ],
+              ),
+            ],
+
             // Récompense
             if (challenge.reward.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -157,6 +262,15 @@ class ChallengeCard extends StatelessWidget {
                       child: Text(challenge.reward,
                           style: theme.textTheme.bodySmall),
                     ),
+                    if (challenge.rewardPoints > 0)
+                      Text(
+                        '${challenge.rewardPoints} pts',
+                        style: const TextStyle(
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
                   ],
                 ),
               ),
