@@ -6,7 +6,6 @@ import '../../../shared/providers/user_provider.dart';
 import '../../../features/auth/domain/user_model.dart';
 import '../../../core/theme/app_colors.dart';
 import 'widgets/actu_card.dart';
-import 'publish_actu_screen.dart';
 
 class ActualitesScreen extends ConsumerStatefulWidget {
   const ActualitesScreen({super.key});
@@ -23,26 +22,10 @@ class _ActualitesScreenState extends ConsumerState<ActualitesScreen> {
     final user = ref.watch(userProvider);
     if (user == null) return const SizedBox.shrink();
 
-    final canPublish = user.role == UserRole.commercial;
     final repo = ref.read(actualitesRepositoryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Actualités'),
-        actions: [
-          if (canPublish)
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline),
-              tooltip: 'Publier une actualité',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const PublishActuScreen(),
-                  fullscreenDialog: true,
-                ),
-              ),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Actualités')),
       body: Column(
         children: [
           // ── Filtres catégorie ────────────────────────────────────────────
@@ -79,19 +62,7 @@ class _ActualitesScreenState extends ConsumerState<ActualitesScreen> {
                     itemCount: list.length,
                     separatorBuilder: (context, i) =>
                         const SizedBox(height: 12),
-                    itemBuilder: (context, i) => ActuCard(
-                      actu: list[i],
-                      canManage: canPublish,
-                      onDelete: canPublish
-                          ? () => _confirmDelete(context, repo, list[i])
-                          : null,
-                      onTogglePin: canPublish
-                          ? () => repo.togglePin(
-                                list[i].id,
-                                !list[i].isPinned,
-                              )
-                          : null,
-                    ),
+                    itemBuilder: (context, i) => ActuCard(actu: list[i]),
                   ),
                 );
               },
@@ -102,31 +73,6 @@ class _ActualitesScreenState extends ConsumerState<ActualitesScreen> {
     );
   }
 
-  Future<void> _confirmDelete(
-    BuildContext context,
-    ActualitesRepository repo,
-    ActuModel actu,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer cette actualité ?'),
-        content: Text(actu.title),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await repo.delete(actu.id);
-  }
 }
 
 // ── Filtres catégorie ─────────────────────────────────────────────────────────

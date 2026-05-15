@@ -5,17 +5,8 @@ import '../../../../core/theme/app_colors.dart';
 
 class ActuCard extends StatelessWidget {
   final ActuModel actu;
-  final bool canManage;
-  final VoidCallback? onDelete;
-  final VoidCallback? onTogglePin;
 
-  const ActuCard({
-    super.key,
-    required this.actu,
-    this.canManage = false,
-    this.onDelete,
-    this.onTogglePin,
-  });
+  const ActuCard({super.key, required this.actu});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +43,7 @@ class ActuCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── En-tête : catégorie + épingle + menu ──────────────────
+                  // ── En-tête : catégorie + épingle + date ──────────────────
                   Row(
                     children: [
                       _CategoryBadge(category: actu.category),
@@ -62,54 +53,12 @@ class ActuCard extends StatelessWidget {
                             size: 14, color: AppColors.primary),
                       ],
                       const Spacer(),
-                      // Date
                       Text(
                         _formatDate(actu.publishedAt),
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      // Menu admin
-                      if (canManage)
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, size: 18),
-                          onSelected: (v) {
-                            if (v == 'pin') onTogglePin?.call();
-                            if (v == 'delete') onDelete?.call();
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: 'pin',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    actu.isPinned
-                                        ? Icons.push_pin_outlined
-                                        : Icons.push_pin,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(actu.isPinned
-                                      ? 'Dés-épingler'
-                                      : 'Épingler'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline,
-                                      size: 16, color: AppColors.error),
-                                  SizedBox(width: 8),
-                                  Text('Supprimer',
-                                      style:
-                                          TextStyle(color: AppColors.error)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
                     ],
                   ),
                   const SizedBox(height: 10),
