@@ -1,12 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum UserRole { pharmacien, medecin, kine, commercial }
+enum UserRole { pharmacien, preparateur, medecin, kine, commercial }
 
 extension UserRoleExtension on UserRole {
   String get label {
     switch (this) {
       case UserRole.pharmacien:
         return 'Pharmacien';
+      case UserRole.preparateur:
+        return 'Préparateur';
       case UserRole.medecin:
         return 'Médecin';
       case UserRole.kine:
@@ -20,6 +22,8 @@ extension UserRoleExtension on UserRole {
     switch (this) {
       case UserRole.pharmacien:
         return 'pharmacien';
+      case UserRole.preparateur:
+        return 'preparateur';
       case UserRole.medecin:
         return 'medecin';
       case UserRole.kine:
@@ -32,6 +36,8 @@ extension UserRoleExtension on UserRole {
 
 UserRole userRoleFromString(String value) {
   switch (value.toLowerCase()) {
+    case 'preparateur':
+      return UserRole.preparateur;
     case 'medecin':
       return UserRole.medecin;
     case 'kine':
@@ -51,11 +57,10 @@ class UserModel {
   final String region;
   final String level;
   final DateTime createdAt;
-
-  /// Si true, l'utilisateur a accès à la section Administration.
-  /// À positionner manuellement dans Firebase Console :
-  /// users/{uid} → isAdmin: true
   final bool isAdmin;
+
+  /// UID du pharmacien manager (pour les préparateurs uniquement).
+  final String? managerId;
 
   const UserModel({
     required this.uid,
@@ -66,9 +71,13 @@ class UserModel {
     required this.level,
     required this.createdAt,
     this.isAdmin = false,
+    this.managerId,
   });
 
   String get firstName => name.split(' ').first;
+
+  /// Vrai si ce pharmacien peut gérer une équipe de préparateurs.
+  bool get canManageTeam => role == UserRole.pharmacien;
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -81,6 +90,7 @@ class UserModel {
       level: data['level'] ?? 'Débutant',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isAdmin: data['isAdmin'] as bool? ?? false,
+      managerId: data['managerId'] as String?,
     );
   }
 
@@ -92,6 +102,7 @@ class UserModel {
         'level': level,
         'createdAt': Timestamp.fromDate(createdAt),
         'isAdmin': isAdmin,
+        if (managerId != null) 'managerId': managerId,
       };
 }
 
@@ -99,7 +110,11 @@ class RolePermissions {
   static const Map<UserRole, List<String>> modules = {
     UserRole.pharmacien: [
       'dashboard', 'formations', 'challenges', 'menu',
-      'actualites', 'produits', 'pubs', 'packs', 'factures', 'labo',
+      'actualites', 'produits', 'pubs', 'packs', 'factures', 'labo', 'equipe',
+    ],
+    UserRole.preparateur: [
+      'dashboard', 'formations', 'menu',
+      'actualites', 'produits', 'pubs', 'labo',
     ],
     UserRole.medecin: [
       'dashboard', 'formations', 'challenges', 'menu',
