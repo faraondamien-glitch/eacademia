@@ -1,0 +1,37 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "actualites",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isPinned",    "order": "DESCENDING" },
+        { "fieldPath": "publishedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "commandes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",    "order": "ASCENDING"  },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pubs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "targetRoles",   "arrayConfig": "CONTAINS" },
+        { "fieldPath": "broadcastDate", "order": "DESCENDING"     }
+      ]
+    },
+    {
+      "collectionGroup": "factures",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING"  },
+        { "fieldPath": "date",   "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

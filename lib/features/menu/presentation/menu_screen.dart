@@ -139,6 +139,8 @@ class MenuScreen extends ConsumerWidget {
         Icons.receipt_long_outlined, Color(0xFF8D6E63)),
     _MenuEntry('labo', '/labo', 'Le Labo',
         Icons.biotech_outlined, Color(0xFF00897B)),
+    _MenuEntry('equipe', '/equipe', 'Mon Équipe',
+        Icons.group_outlined, Color(0xFF0288D1)),
     _MenuEntry('analytics', '/analytics', 'Analytics',
         Icons.bar_chart_outlined, Color(0xFF7B1FA2)),
   ];
@@ -147,7 +149,7 @@ class MenuScreen extends ConsumerWidget {
 // ── Carte profil ──────────────────────────────────────────────────────────────
 
 class _ProfileCard extends StatelessWidget {
-  final dynamic user;
+  final UserModel user;
   const _ProfileCard({required this.user});
 
   @override

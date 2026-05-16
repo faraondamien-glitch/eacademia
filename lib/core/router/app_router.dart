@@ -25,6 +25,7 @@ import '../../features/admin/presentation/screens/admin_users_screen.dart';
 import '../../features/admin/presentation/screens/admin_notifications_screen.dart';
 import '../../features/admin/presentation/screens/admin_commandes_screen.dart';
 import '../../features/produits/presentation/pdf_viewer_screen.dart';
+import '../../features/equipe/presentation/equipe_screen.dart';
 import '../../shared/providers/user_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -166,6 +167,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             name: 'labo',
             builder: (_, s) => const LaboScreen(),
           ),
+          GoRoute(
+            path: '/equipe',
+            name: 'equipe',
+            builder: (_, s) => const EquipeScreen(),
+          ),
 
           // ── Section Administration ─────────────────────────────────────
           GoRoute(
@@ -280,7 +286,7 @@ class AppShell extends ConsumerWidget {
     // Menu : toutes les pages "secondaires" pointent vers l'onglet Menu
     const menuRoutes = [
       '/menu', '/actualites', '/produits', '/pubs',
-      '/packs', '/factures', '/labo', '/analytics',
+      '/packs', '/factures', '/labo', '/analytics', '/equipe',
     ];
     for (var i = 0; i < _navItems.length - 1; i++) {
       if (location.startsWith(_navItems[i].route)) return i;

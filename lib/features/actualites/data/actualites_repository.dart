@@ -16,12 +16,17 @@ class ActualitesRepository {
   }) {
     Query<Map<String, dynamic>> q = _db
         .collection(_col)
-        .orderBy('isPinned', descending: true)
         .orderBy('publishedAt', descending: true)
         .limit(50);
 
     return q.snapshots().map((snap) {
       var list = snap.docs.map(ActuModel.fromFirestore).toList();
+
+      // Tri client : épinglées en tête (évite l'index composite Firestore)
+      list.sort((a, b) {
+        if (a.isPinned == b.isPinned) return 0;
+        return a.isPinned ? -1 : 1;
+      });
 
       // Filtre rôle côté client (Firestore ne supporte pas OR sur arrayContains)
       if (role != null) {

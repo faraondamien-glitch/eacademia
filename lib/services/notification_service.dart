@@ -164,10 +164,11 @@ class NotificationService {
 
     // Topic spécifique au rôle
     final roleTopic = switch (role) {
-      UserRole.pharmacien => AppConstants.topicPharmacien,
-      UserRole.medecin => AppConstants.topicMedecin,
-      UserRole.kine => AppConstants.topicKine,
-      UserRole.commercial => AppConstants.topicCommercial,
+      UserRole.pharmacien  => AppConstants.topicPharmacien,
+      UserRole.preparateur => AppConstants.topicPharmacien, // même topic que pharmacien
+      UserRole.medecin     => AppConstants.topicMedecin,
+      UserRole.kine        => AppConstants.topicKine,
+      UserRole.commercial  => AppConstants.topicCommercial,
     };
     await _fcm.subscribeToTopic(roleTopic);
   }
@@ -176,10 +177,11 @@ class NotificationService {
   static Future<void> unsubscribeAll(UserRole role) async {
     await _fcm.unsubscribeFromTopic(AppConstants.topicAll);
     final roleTopic = switch (role) {
-      UserRole.pharmacien => AppConstants.topicPharmacien,
-      UserRole.medecin => AppConstants.topicMedecin,
-      UserRole.kine => AppConstants.topicKine,
-      UserRole.commercial => AppConstants.topicCommercial,
+      UserRole.pharmacien  => AppConstants.topicPharmacien,
+      UserRole.preparateur => AppConstants.topicPharmacien,
+      UserRole.medecin     => AppConstants.topicMedecin,
+      UserRole.kine        => AppConstants.topicKine,
+      UserRole.commercial  => AppConstants.topicCommercial,
     };
     await _fcm.unsubscribeFromTopic(roleTopic);
   }
