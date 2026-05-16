@@ -64,3 +64,9 @@ android/key.properties
 # (firebase_options.dart est volontairement inclus car requis par FlutterFire)
 google-services.json
 GoogleService-Info.plist
+
+# Node modules
+node_modules/
+
+# Firebase local
+.firebase/
