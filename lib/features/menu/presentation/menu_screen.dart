@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/providers/user_provider.dart';
+import '../../../shared/providers/theme_provider.dart';
 import '../../../features/auth/domain/user_model.dart';
 import '../../../features/auth/data/auth_repository.dart';
 import '../../../core/theme/app_colors.dart';
@@ -78,6 +79,10 @@ class MenuScreen extends ConsumerWidget {
 
           const Divider(),
           const SizedBox(height: 8),
+          _ThemeTile(
+            mode: ref.watch(themeModeProvider),
+            onSelect: (m) => ref.read(themeModeProvider.notifier).set(m),
+          ),
           _SecondaryAction(
             icon: Icons.help_outline,
             label: 'Aide & Support',
@@ -319,4 +324,69 @@ class _MenuEntry {
   final Color color;
   const _MenuEntry(
       this.module, this.route, this.label, this.icon, this.color);
+}
+
+// ── Sélecteur de thème ────────────────────────────────────────────────────────
+
+class _ThemeTile extends StatelessWidget {
+  final ThemeMode mode;
+  final ValueChanged<ThemeMode> onSelect;
+  const _ThemeTile({required this.mode, required this.onSelect});
+
+  static const _labels = {
+    ThemeMode.light: 'Clair',
+    ThemeMode.dark: 'Sombre',
+    ThemeMode.system: 'Système',
+  };
+
+  static const _icons = {
+    ThemeMode.light: Icons.light_mode_outlined,
+    ThemeMode.dark: Icons.dark_mode_outlined,
+    ThemeMode.system: Icons.brightness_auto_outlined,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(_icons[mode], size: 22),
+      title: const Text('Thème'),
+      subtitle: Text(_labels[mode] ?? ''),
+      trailing: const Icon(Icons.chevron_right, size: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      dense: true,
+      onTap: () => _openPicker(context),
+    );
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    final picked = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Choisir le thème',
+                    style: Theme.of(ctx).textTheme.titleMedium),
+              ),
+            ),
+            for (final m in ThemeMode.values)
+              RadioListTile<ThemeMode>(
+                value: m,
+                groupValue: mode,
+                onChanged: (v) => Navigator.pop(ctx, v),
+                title: Text(_labels[m]!),
+                secondary: Icon(_icons[m]),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) onSelect(picked);
+  }
 }
