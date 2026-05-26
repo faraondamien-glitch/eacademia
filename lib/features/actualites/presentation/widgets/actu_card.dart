@@ -12,37 +12,45 @@ class ActuCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final hasImage = actu.imageUrl != null && actu.imageUrl!.isNotEmpty;
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _showDetail(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Image (optionnelle) ────────────────────────────────────────
-            if (actu.imageUrl != null && actu.imageUrl!.isNotEmpty)
-              SizedBox(
-                height: 180,
-                width: double.infinity,
-                child: CachedNetworkImage(
-                  imageUrl: actu.imageUrl!,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                  ),
-                  errorWidget: (context, url, err) => Container(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: const Icon(Icons.broken_image_outlined,
-                        color: AppColors.textDisabled),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Vignette (optionnelle) ─────────────────────────────────
+              if (hasImage) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 84,
+                    height: 84,
+                    child: CachedNetworkImage(
+                      imageUrl: actu.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                      ),
+                      errorWidget: (context, url, err) => Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: const Icon(Icons.broken_image_outlined,
+                            color: AppColors.textDisabled, size: 20),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+              ],
 
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   // ── En-tête : catégorie + épingle + date ──────────────────
                   Row(
                     children: [
@@ -126,10 +134,11 @@ class ActuCard extends StatelessWidget {
                       ],
                     ],
                   ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
