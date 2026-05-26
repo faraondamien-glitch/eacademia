@@ -46,6 +46,9 @@ dependencies:
   # Stockage sécurisé
   flutter_secure_storage: ^9.0.0
 
+  # Préférences locales (thème, etc.)
+  shared_preferences: ^2.2.2
+
   # Fichiers temporaires (PDF cache)
   path_provider: ^2.1.5
 

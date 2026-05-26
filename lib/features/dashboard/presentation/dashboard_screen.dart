@@ -173,38 +173,46 @@ class _WelcomeBanner extends StatelessWidget {
   }
 }
 
-// ── Grille KPI ───────────────────────────────────────────────────────────────
+// ── Section KPI (dépliable) ──────────────────────────────────────────────────
 
-class _KpiGrid extends StatelessWidget {
+class _KpiGrid extends StatefulWidget {
   final DashboardKpi? kpi;
   final UserRole role;
 
   const _KpiGrid({required this.kpi, required this.role});
 
   @override
+  State<_KpiGrid> createState() => _KpiGridState();
+}
+
+class _KpiGridState extends State<_KpiGrid> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final items = [
+    final theme = Theme.of(context);
+    final items = <_KpiEntry>[
       _KpiEntry(
         title: 'Formations',
-        value: kpi != null ? '${kpi!.formationsEnCours}' : '—',
+        value: widget.kpi != null ? '${widget.kpi!.formationsEnCours}' : '—',
         subtitle: 'en cours',
         icon: Icons.school_outlined,
         color: AppColors.primary,
         module: 'formations',
       ),
-      if (RolePermissions.hasAccess(role, 'challenges'))
+      if (RolePermissions.hasAccess(widget.role, 'challenges'))
         _KpiEntry(
           title: 'Score',
-          value: kpi != null ? '${kpi!.scoreChallenge}' : '—',
+          value: widget.kpi != null ? '${widget.kpi!.scoreChallenge}' : '—',
           subtitle: 'pts challenge',
           icon: Icons.emoji_events_outlined,
           color: AppColors.secondary,
           module: 'challenges',
         ),
-      if (RolePermissions.hasAccess(role, 'factures'))
+      if (RolePermissions.hasAccess(widget.role, 'factures'))
         _KpiEntry(
           title: 'Factures',
-          value: kpi != null ? '${kpi!.facturesEnAttente}' : '—',
+          value: widget.kpi != null ? '${widget.kpi!.facturesEnAttente}' : '—',
           subtitle: 'en attente',
           icon: Icons.receipt_long_outlined,
           color: AppColors.error,
@@ -212,32 +220,119 @@ class _KpiGrid extends StatelessWidget {
         ),
       _KpiEntry(
         title: 'Nouveautés',
-        value: kpi != null ? '${kpi!.nouveautes}' : '—',
+        value: widget.kpi != null ? '${widget.kpi!.nouveautes}' : '—',
         subtitle: 'ce mois',
         icon: Icons.new_releases_outlined,
         color: AppColors.success,
         module: 'formations',
       ),
-    ];
+    ].take(4).toList();
 
-    final displayed = items.take(4).toList();
+    return Card(
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        for (final e in items) ...[
+                          _KpiMini(entry: e),
+                          if (e != items.last) const SizedBox(width: 10),
+                        ],
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.expand_more,
+                        color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            child: _expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: Column(
+                      children: [
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.4,
+                          children: items
+                              .map((e) => KpiCard(
+                                    title: e.title,
+                                    value: e.value,
+                                    subtitle: e.subtitle,
+                                    icon: e.icon,
+                                    color: e.color,
+                                  ))
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.4,
-      children: displayed
-          .map((e) => KpiCard(
-                title: e.title,
-                value: e.value,
-                subtitle: e.subtitle,
-                icon: e.icon,
-                color: e.color,
-              ))
-          .toList(),
+class _KpiMini extends StatelessWidget {
+  final _KpiEntry entry;
+  const _KpiMini({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: entry.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(entry.icon, color: entry.color, size: 16),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            entry.value,
+            style: TextStyle(
+              color: entry.color,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            entry.title,
+            style: Theme.of(context).textTheme.bodySmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }
