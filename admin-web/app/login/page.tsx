@@ -42,15 +42,13 @@ export default function LoginPage() {
   if (loading) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1A1A2E]">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-600 rounded-2xl mb-4">
-            <span className="text-white font-black text-2xl">G</span>
-          </div>
-          <h1 className="text-white font-bold text-xl">Granions Back-office</h1>
-          <p className="text-white/50 text-sm mt-1">Réservé aux administrateurs</p>
+          <img src="/logo-granions.png" alt="Granions" className="h-10 w-auto mx-auto mb-4" />
+          <h1 className="text-gray-900 font-bold text-xl">Back-office</h1>
+          <p className="text-gray-500 text-sm mt-1">Réservé aux administrateurs</p>
         </div>
 
         {/* Form */}
@@ -92,7 +90,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-[#1A1A2E] text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {submitting && (
               <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

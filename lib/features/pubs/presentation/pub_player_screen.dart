@@ -4,10 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../data/pubs_repository.dart';
 import '../domain/pub_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+
+String? _extractYoutubeId(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return null;
+  if (uri.host.contains('youtube.com')) return uri.queryParameters['v'];
+  if (uri.host.contains('youtu.be')) return uri.pathSegments.firstOrNull;
+  return null;
+}
 
 class PubPlayerScreen extends ConsumerStatefulWidget {
   final String pubId;
@@ -20,6 +29,7 @@ class PubPlayerScreen extends ConsumerStatefulWidget {
 class _PubPlayerScreenState extends ConsumerState<PubPlayerScreen> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
+  YoutubePlayerController? _youtubeController;
   PubModel? _pub;
 
   // États
@@ -61,7 +71,23 @@ class _PubPlayerScreenState extends ConsumerState<PubPlayerScreen> {
         return;
       }
 
-      // Initialise le player vidéo
+      // Détecte YouTube
+      final youtubeId = _extractYoutubeId(pub.videoUrl);
+      if (youtubeId != null) {
+        _youtubeController = YoutubePlayerController.fromVideoId(
+          videoId: youtubeId,
+          autoPlay: true,
+          params: const YoutubePlayerParams(
+            showControls: true,
+            showFullscreenButton: true,
+            mute: false,
+          ),
+        );
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // Sinon player vidéo classique
       final controller =
           VideoPlayerController.networkUrl(Uri.parse(pub.videoUrl));
       await controller.initialize();
@@ -79,20 +105,14 @@ class _PubPlayerScreenState extends ConsumerState<PubPlayerScreen> {
         allowMuting: true,
         showControls: true,
         showOptions: false,
-        // Retour en portrait après plein écran
-        deviceOrientationsAfterFullScreen: [
-          DeviceOrientation.portraitUp,
-        ],
-        // Autorise landscape en plein écran
+        deviceOrientationsAfterFullScreen: [DeviceOrientation.portraitUp],
         deviceOrientationsOnEnterFullScreen: [
           DeviceOrientation.landscapeLeft,
           DeviceOrientation.landscapeRight,
         ],
         placeholder: Container(color: Colors.black),
-        errorBuilder: (context, msg) => _VideoError(
-          message: msg,
-          onRetry: _reloadVideo,
-        ),
+        errorBuilder: (context, msg) =>
+            _VideoError(message: msg, onRetry: _reloadVideo),
       );
 
       if (mounted) setState(() => _isLoading = false);
@@ -116,6 +136,8 @@ class _PubPlayerScreenState extends ConsumerState<PubPlayerScreen> {
     _chewieController = null;
     _videoController?.dispose();
     _videoController = null;
+    _youtubeController?.close();
+    _youtubeController = null;
   }
 
   @override
@@ -189,6 +211,10 @@ class _PubPlayerScreenState extends ConsumerState<PubPlayerScreen> {
 
     if (_error != null) {
       return _VideoError(message: _error!, onRetry: _reloadVideo);
+    }
+
+    if (_youtubeController != null) {
+      return YoutubePlayer(controller: _youtubeController!);
     }
 
     if (_chewieController != null) {

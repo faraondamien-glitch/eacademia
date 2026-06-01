@@ -24,7 +24,7 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('EACADEMIA'),
+        title: Image.asset('assets/images/logo_granions.png', height: 28),
         actions: [
           _NotificationBell(userId: user.uid, repo: repo),
           const SizedBox(width: 8),
@@ -49,22 +49,6 @@ class DashboardScreen extends ConsumerWidget {
                   return _KpiGrid(kpi: kpi, role: user.role);
                 },
               ),
-              const SizedBox(height: 24),
-
-              // Notifications
-              Row(
-                children: [
-                  Text('Notifications récentes',
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('Voir tout'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _NotificationsList(userId: user.uid, repo: repo),
               const SizedBox(height: 24),
 
               // Formations en cours

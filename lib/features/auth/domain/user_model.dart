@@ -58,6 +58,7 @@ class UserModel {
   final String level;
   final DateTime createdAt;
   final bool isAdmin;
+  final String? pharmacyName;
 
   /// UID du pharmacien manager (pour les préparateurs uniquement).
   final String? managerId;
@@ -71,6 +72,7 @@ class UserModel {
     required this.level,
     required this.createdAt,
     this.isAdmin = false,
+    this.pharmacyName,
     this.managerId,
   });
 
@@ -90,6 +92,7 @@ class UserModel {
       level: data['level'] ?? 'Débutant',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isAdmin: data['isAdmin'] as bool? ?? false,
+      pharmacyName: data['pharmacyName'] as String?,
       managerId: data['managerId'] as String?,
     );
   }
@@ -102,6 +105,7 @@ class UserModel {
         'level': level,
         'createdAt': Timestamp.fromDate(createdAt),
         'isAdmin': isAdmin,
+        if (pharmacyName != null) 'pharmacyName': pharmacyName,
         if (managerId != null) 'managerId': managerId,
       };
 }

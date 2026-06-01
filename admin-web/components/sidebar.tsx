@@ -31,18 +31,11 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-[#1A1A2E] text-white flex flex-col h-screen fixed left-0 top-0">
+    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen fixed left-0 top-0">
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-500 rounded-xl flex items-center justify-center font-black text-white text-lg">
-            G
-          </div>
-          <div>
-            <p className="font-bold text-white text-sm leading-none">GRANIONS</p>
-            <p className="text-white/50 text-xs mt-0.5">Back-office</p>
-          </div>
-        </div>
+      <div className="px-6 py-5 border-b border-gray-100">
+        <img src="/logo-granions.png" alt="Granions" className="h-8 w-auto" />
+        <p className="text-gray-400 text-xs mt-1.5">Back-office</p>
       </div>
 
       {/* Nav */}
@@ -56,7 +49,7 @@ export function Sidebar() {
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 active
                   ? 'bg-indigo-600 text-white'
-                  : 'text-white/60 hover:text-white hover:bg-white/10'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
               <Icon size={18} />
@@ -67,10 +60,10 @@ export function Sidebar() {
       </nav>
 
       {/* Sign out */}
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 py-4 border-t border-gray-100">
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-3 px-3 py-2.5 w-full text-sm font-medium text-white/60 hover:text-red-400 hover:bg-white/5 rounded-xl transition-colors"
+          className="flex items-center gap-3 px-3 py-2.5 w-full text-sm font-medium text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
         >
           <LogOut size={18} />
           Se déconnecter

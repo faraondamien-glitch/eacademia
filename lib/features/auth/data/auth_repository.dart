@@ -29,16 +29,28 @@ class AuthRepository {
     if (credential.user == null) return null;
     final user = await _fetchUserProfile(credential.user!.uid);
     if (user != null) {
-      await _secureStorage.write(key: AppConstants.keyUserId, value: user.uid);
-      await _secureStorage.write(key: AppConstants.keyUserEmail, value: user.email);
+      try {
+        await _secureStorage.write(key: AppConstants.keyUserId, value: user.uid);
+        await _secureStorage.write(key: AppConstants.keyUserEmail, value: user.email);
+      } catch (_) {
+        // Stockage sécurisé non disponible sur cette plateforme — ignoré
+      }
     }
     return user;
   }
 
   Future<UserModel?> getStoredUser() async {
-    final uid = await _secureStorage.read(key: AppConstants.keyUserId);
-    if (uid == null || _auth.currentUser == null) return null;
-    return _fetchUserProfile(uid);
+    try {
+      final uid = await _secureStorage.read(key: AppConstants.keyUserId);
+      if (uid == null || _auth.currentUser == null) return null;
+      return _fetchUserProfile(uid);
+    } catch (_) {
+      // Sur web, flutter_secure_storage peut ne pas être disponible
+      if (_auth.currentUser != null) {
+        return _fetchUserProfile(_auth.currentUser!.uid);
+      }
+      return null;
+    }
   }
 
   Future<UserModel?> _fetchUserProfile(String uid) async {

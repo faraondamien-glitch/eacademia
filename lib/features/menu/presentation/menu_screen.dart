@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../shared/providers/user_provider.dart';
 import '../../../shared/providers/theme_provider.dart';
 import '../../../features/auth/domain/user_model.dart';
@@ -102,6 +103,13 @@ class MenuScreen extends ConsumerWidget {
             color: AppColors.error,
             onTap: () => _signOut(context, ref),
           ),
+
+          // ── Contact ────────────────────────────────────────────────────
+          const SizedBox(height: 8),
+          const Divider(),
+          const SizedBox(height: 16),
+          const _ContactSection(),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -206,10 +214,10 @@ class _ProfileCard extends StatelessWidget {
                     fontSize: 13,
                   ),
                 ),
-                if (user.region.isNotEmpty) ...[
+                if ((user.pharmacyName ?? user.region).isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    user.region,
+                    user.pharmacyName ?? user.region,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 11,
@@ -388,5 +396,149 @@ class _ThemeTile extends StatelessWidget {
       ),
     );
     if (picked != null) onSelect(picked);
+  }
+}
+
+// ── Section Contact ───────────────────────────────────────────────────────────
+
+class _ContactSection extends StatelessWidget {
+  const _ContactSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text('Contact', style: theme.textTheme.labelLarge),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.12)),
+          ),
+          child: Column(
+            children: [
+              _ContactTile(
+                icon: Icons.medical_services_outlined,
+                label: 'Service médical',
+                value: 'medical@granions.fr',
+                onTap: () =>
+                    launchUrl(Uri.parse('mailto:medical@granions.fr')),
+                isFirst: true,
+              ),
+              const Divider(height: 1, indent: 56),
+              _ContactTile(
+                icon: Icons.handshake_outlined,
+                label: 'Délégués commerciaux',
+                value: 'commercial@granions.fr',
+                onTap: () =>
+                    launchUrl(Uri.parse('mailto:commercial@granions.fr')),
+              ),
+              const Divider(height: 1, indent: 56),
+              _ContactTile(
+                icon: Icons.phone_outlined,
+                label: 'Standard',
+                value: '+33 4 92 96 00 00',
+                onTap: () =>
+                    launchUrl(Uri.parse('tel:+33492960000')),
+              ),
+              const Divider(height: 1, indent: 56),
+              _ContactTile(
+                icon: Icons.location_on_outlined,
+                label: 'Siège social',
+                value: 'Mougins — Sophia Antipolis\nAlpes-Maritimes (06)',
+                onTap: () => launchUrl(Uri.parse(
+                    'https://maps.google.com/?q=Granions,Mougins')),
+                isLast: true,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton.icon(
+            onPressed: () =>
+                launchUrl(Uri.parse('https://www.granions.fr')),
+            icon: const Icon(Icons.open_in_new, size: 14),
+            label: const Text('granions.fr'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ContactTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+  final bool isFirst;
+  final bool isLast;
+
+  const _ContactTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+    this.isFirst = false,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.vertical(
+        top: isFirst ? const Radius.circular(14) : Radius.zero,
+        bottom: isLast ? const Radius.circular(14) : Radius.zero,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.5))),
+                  const SizedBox(height: 1),
+                  Text(value,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                size: 16,
+                color:
+                    theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+          ],
+        ),
+      ),
+    );
   }
 }

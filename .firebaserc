@@ -1,0 +1,13 @@
+{
+  "projects": {
+    "default": "eacademia-app"
+  },
+  "targets": {
+    "eacademia-app": {
+      "hosting": {
+        "admin": ["eacademia-demo"],
+        "app": ["eacademia-app"]
+      }
+    }
+  }
+}

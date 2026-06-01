@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/opeaz_repository.dart';
+import '../data/inapp_challenges_repository.dart';
+import '../domain/inapp_challenge_model.dart';
 import '../../../shared/providers/user_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/config/opeaz_config.dart';
 import 'widgets/challenge_card.dart';
 import 'widgets/opeaz_leaderboard_widget.dart';
 import 'widgets/rewards_widget.dart';
+import 'widgets/inapp_challenge_card.dart';
 
 class ChallengesScreen extends ConsumerStatefulWidget {
   const ChallengesScreen({super.key});
@@ -25,7 +29,7 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _loadData();
   }
 
@@ -83,50 +87,292 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
+            Tab(text: 'Opeaz'),
+            Tab(text: 'Formations'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // ── Onglet Opeaz ─────────────────────────────────────────────────
+          _loading
+              ? const _ChallengesSkeleton()
+              : _error != null
+                  ? _ErrorState(message: _error!, onRetry: _loadData)
+                  : _OpeazTab(challenges: _challenges ?? [], user: user),
+
+          // ── Onglet Formations (in-app) ───────────────────────────────────
+          _FormationsTab(user: user),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Onglet Opeaz ─────────────────────────────────────────────────────────────
+
+class _OpeazTab extends StatefulWidget {
+  final List<ChallengeWithProgress> challenges;
+  final dynamic user;
+
+  const _OpeazTab({required this.challenges, required this.user});
+
+  @override
+  State<_OpeazTab> createState() => _OpeazTabState();
+}
+
+class _OpeazTabState extends State<_OpeazTab>
+    with SingleTickerProviderStateMixin {
+  late final TabController _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _sub.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final actifs =
+        widget.challenges.where((c) => c.challenge.isActive).toList();
+    final termines =
+        widget.challenges.where((c) => !c.challenge.isActive).toList();
+
+    return Column(
+      children: [
+        TabBar(
+          controller: _sub,
+          tabs: const [
             Tab(text: 'En cours'),
             Tab(text: 'Terminés'),
             Tab(text: 'Récompenses'),
           ],
         ),
-      ),
-      body: _loading
-          ? const _ChallengesSkeleton()
-          : _error != null
-              ? _ErrorState(message: _error!, onRetry: _loadData)
-              : _ChallengesTabView(
-                  challenges: _challenges ?? [],
-                  tabController: _tabController,
-                  user: user,
-                ),
+        Expanded(
+          child: TabBarView(
+            controller: _sub,
+            children: [
+              _ActiveTab(challenges: actifs, user: widget.user),
+              _TerminatedTab(challenges: termines),
+              RewardsWidget(
+                  userId: widget.user.uid, userEmail: widget.user.email),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-// ── TabView principal ─────────────────────────────────────────────────────────
+// ── Onglet Formations (in-app challenges) ────────────────────────────────────
 
-class _ChallengesTabView extends StatelessWidget {
-  final List<ChallengeWithProgress> challenges;
-  final TabController tabController;
+class _FormationsTab extends StatefulWidget {
   final dynamic user;
+  const _FormationsTab({required this.user});
 
-  const _ChallengesTabView({
-    required this.challenges,
-    required this.tabController,
-    required this.user,
-  });
+  @override
+  State<_FormationsTab> createState() => _FormationsTabState();
+}
+
+class _FormationsTabState extends State<_FormationsTab> {
+  List<InAppChallengeWithProgress>? _items;
+  String? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final repo = InAppChallengesRepository();
+      final snap = await FirebaseFirestore.instance
+          .collection('inapp_challenges')
+          .get();
+      final challenges = snap.docs.map(InAppChallengeModel.fromFirestore).toList();
+
+      final items = await Future.wait(
+        challenges.map((c) async {
+          final current = await repo.getProgress(
+            userId: widget.user.uid,
+            challenge: c,
+          );
+          return InAppChallengeWithProgress(challenge: c, current: current);
+        }),
+      );
+
+      if (mounted) setState(() { _items = items; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final actifs = challenges.where((c) => c.challenge.isActive).toList();
-    final termines = challenges.where((c) => !c.challenge.isActive).toList();
+    final theme = Theme.of(context);
 
-    return TabBarView(
-      controller: tabController,
-      children: [
-        _ActiveTab(challenges: actifs, user: user),
-        _TerminatedTab(challenges: termines),
-        RewardsWidget(userId: user.uid, userEmail: user.email),
-      ],
+    if (_loading) return const _ChallengesSkeleton();
+    if (_error != null) {
+      return _ErrorState(message: 'Erreur : $_error', onRetry: _load);
+    }
+
+    final items = _items ?? [];
+    final totalPoints = items
+        .where((i) => i.isCompleted)
+        .fold(0, (sum, i) => sum + i.challenge.rewardPoints);
+    final euroValue = (totalPoints * 0.5);
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+          // ── Bannière ──────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.school, color: Colors.white, size: 36),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Suivi formations',
+                          style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${items.where((i) => i.isCompleted).length} / ${items.length} objectifs atteints',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Liste des challenges ───────────────────────────────────────
+          if (items.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    Icon(Icons.emoji_events_outlined,
+                        size: 56,
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.4)),
+                    const SizedBox(height: 16),
+                    Text('Aucun challenge disponible',
+                        style: theme.textTheme.titleMedium,
+                        textAlign: TextAlign.center),
+                  ],
+                ),
+              ),
+            )
+          else ...[
+            Text('Objectifs', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ...items.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: InAppChallengeCard(item: item),
+                )),
+          ],
+
+          // ── Cagnotte ──────────────────────────────────────────────────
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.secondary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.card_giftcard,
+                          color: AppColors.secondary, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Ma cagnotte',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _CagnotteMetric(
+                        label: 'Points gagnés',
+                        value: '$totalPoints pts',
+                        icon: Icons.stars_rounded,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 48,
+                      color: AppColors.secondary.withValues(alpha: 0.2),
+                    ),
+                    Expanded(
+                      child: _CagnotteMetric(
+                        label: 'Carte cadeau',
+                        value: '${euroValue % 1 == 0 ? euroValue.toInt() : euroValue.toStringAsFixed(1)} €',
+                        icon: Icons.redeem,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '1 point = 0,50 € · Cumulez des points en complétant vos objectifs',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.secondary.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -383,6 +629,46 @@ class _ErrorState extends StatelessWidget {
     );
   }
 }
+
+// ── Métrique cagnotte ─────────────────────────────────────────────────────────
+
+class _CagnotteMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _CagnotteMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: AppColors.secondary, size: 20),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.secondary,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ChallengesSkeleton extends StatelessWidget {
   const _ChallengesSkeleton();

@@ -29,11 +29,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _tryAutoLogin() async {
-    final repo = ref.read(authRepositoryProvider);
-    final user = await repo.getStoredUser();
-    if (user != null && mounted) {
-      ref.read(userProvider.notifier).setUser(user);
-      context.go('/dashboard');
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      final user = await repo.getStoredUser();
+      if (user != null && mounted) {
+        ref.read(userProvider.notifier).setUser(user);
+        context.go('/dashboard');
+      }
+    } catch (_) {
+      // Échec silencieux — l'utilisateur reste sur la page de connexion
     }
   }
 
@@ -50,6 +54,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (user != null && mounted) {
         ref.read(userProvider.notifier).setUser(user);
         context.go('/dashboard');
+      } else if (mounted) {
+        setState(() => _errorMessage = 'Compte introuvable. Contactez votre administrateur.');
       }
     } catch (e) {
       setState(() => _errorMessage = _parseError(e));
@@ -66,7 +72,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (msg.contains('network-request-failed')) {
       return 'Vérifiez votre connexion internet.';
     }
-    return 'Une erreur est survenue. Réessayez.';
+    return 'Erreur : $msg';
   }
 
   @override
@@ -122,15 +128,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Center(
-                    child: Text(
-                      'EACADEMIA',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.secondary,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 48),
 
                   Text(

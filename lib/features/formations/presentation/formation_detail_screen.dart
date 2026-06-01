@@ -79,10 +79,12 @@ class _DetailView extends StatelessWidget {
           SliverAppBar(
             expandedHeight: 240,
             pinned: true,
+            foregroundColor: Colors.white,
             title: Text(
               f.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white),
             ),
             flexibleSpace: FlexibleSpaceBar(
               background: _HeroHeader(

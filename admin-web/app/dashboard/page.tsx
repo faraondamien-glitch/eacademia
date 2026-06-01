@@ -112,7 +112,7 @@ export default function DashboardPage() {
             </Link>
             <Link
               href="/notifications"
-              className="inline-flex items-center gap-2 bg-[#1A1A2E] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-900 transition-colors"
+              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
             >
               <Bell size={16} />
               Envoyer une notification

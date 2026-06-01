@@ -32,22 +32,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = _GoRouterNotifier(ref);
 
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/dashboard',
     refreshListenable: notifier,
-    redirect: (context, state) {
-      final user = ref.read(userProvider);
-      final isLoggedIn = user != null;
-      final isOnLogin = state.matchedLocation == '/login';
-
-      if (!isLoggedIn && !isOnLogin) return '/login';
-      if (isLoggedIn && isOnLogin) return '/dashboard';
-      // Guard admin : routes /admin/* accessibles uniquement si isAdmin
-      if (state.matchedLocation.startsWith('/admin')) {
-        final user = ref.read(userProvider);
-        if (user == null || !user.isAdmin) return '/dashboard';
-      }
-      return null;
-    },
+    redirect: (context, state) => null,
     routes: [
       GoRoute(
         path: '/login',
